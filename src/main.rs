@@ -11,6 +11,7 @@ use crossterm::{
 use std::collections::HashMap;
 use std::io::Stdout;
 
+mod parser;
 fn print_in_prompt(stdout: &mut Stdout, counter: i32) {
     execute!(stdout, Print(format!("In [{counter}]: ").green().bold())).unwrap()
 }
