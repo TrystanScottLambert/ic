@@ -7,11 +7,14 @@ use crossterm::{
     style::Print,
     terminal::{disable_raw_mode, enable_raw_mode},
 };
+use yarer::session::{self, Session};
 
 use std::collections::HashMap;
 use std::io::Stdout;
 
 mod parser;
+use crate::parser::sanitize_string;
+
 fn print_in_prompt(stdout: &mut Stdout, counter: i32) {
     execute!(stdout, Print(format!("In [{counter}]: ").green().bold())).unwrap()
 }
@@ -65,8 +68,16 @@ fn main() {
                         print_in_prompt(&mut stdout, counter);
                     } else {
                         print_out_prompt(&mut stdout, counter);
-                        execute!(stdout, Print(format!("This '{buffer}' will be evaluated")))
-                            .unwrap();
+                        let session = Session::init();
+                        let sanitized_string = sanitize_string(&buffer);
+                        let mut resolver = session.process(&sanitized_string);
+                        // session.set("x", 1) // we can add variables in the future
+                        let answer = resolver.resolve();
+                        if let Ok(num) = answer {
+                            execute!(stdout, Print(format!("{}", num))).unwrap();
+                        } else {
+                            execute!(stdout, Print("\n\rError reading. Try again.")).unwrap();
+                        }
                         history.insert(counter, buffer.clone());
                         history_counter = 0;
 
