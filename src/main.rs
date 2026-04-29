@@ -1,3 +1,4 @@
+use crossterm::cursor::{self, MoveLeft};
 use crossterm::style::Stylize;
 use crossterm::terminal::{Clear, ClearType};
 use crossterm::{
@@ -5,12 +6,12 @@ use crossterm::{
     event::{self, Event, KeyCode},
     execute,
     style::Print,
-    terminal::{disable_raw_mode, enable_raw_mode},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use yarer::session::{self, Session};
 
 use std::collections::HashMap;
-use std::io::Stdout;
+use std::io::{self, Cursor, Stdout, stdout};
 
 mod parser;
 use crate::parser::sanitize_string;
@@ -42,10 +43,15 @@ fn reset_prompt(stdout: &mut Stdout, counter: i32) {
 fn main() {
     let mut stdout = std::io::stdout();
     let mut buffer = String::new();
+    let start_cursor_position: usize = 5;
+    let mut cursor_position: usize = start_cursor;
     let mut history = HashMap::new();
     let mut history_counter = 0;
     enable_raw_mode().unwrap();
     let mut counter = 1;
+    execute!(stdout, Clear(ClearType::All)).unwrap();
+    execute!(stdout, Print("\n\r")).unwrap();
+
     print_in_prompt(&mut stdout, counter);
     loop {
         let thing = event::read().unwrap();
@@ -58,7 +64,8 @@ fn main() {
                     } else {
                         execute!(stdout, Print(c)).unwrap();
                     }
-                    buffer.push(c);
+                    buffer.insert(cursor_position, c);
+                    cursor_position += 1;
                 }
                 KeyCode::Enter => {
                     execute!(stdout, Print("\r\n")).unwrap();
@@ -66,6 +73,10 @@ fn main() {
                     if buffer.trim().is_empty() {
                         execute!(stdout, Print("\r\n")).unwrap();
                         print_in_prompt(&mut stdout, counter);
+                    } else if buffer == "clear" {
+                        execute!(stdout, Clear(ClearType::All)).unwrap();
+                        print_in_prompt(&mut stdout, counter);
+                        buffer.clear();
                     } else {
                         print_out_prompt(&mut stdout, counter);
                         let session = Session::init();
@@ -117,6 +128,12 @@ fn main() {
                     buffer.pop();
                     reset_prompt(&mut stdout, counter);
                     print_color_string(&mut stdout, buffer.clone());
+                }
+                KeyCode::Home => {
+                    let (_, current_column) = cursor::position().unwrap();
+                    let offset = current_column - start_cursor_position;
+
+                    execute!(stdout, Cursor(MoveLeft(offset))).unwrap();
                 }
                 _ => {}
             },
