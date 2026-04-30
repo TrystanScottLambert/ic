@@ -69,7 +69,13 @@ fn main() -> io::Result<()> {
                     } else {
                         execute!(stdout, Print(c))?;
                     }
-                    execute!(stdout, Print(post))?;
+                    for c in post.chars() {
+                        if c.is_numeric() || c == '.' {
+                            execute!(stdout, Print(format!("{}", c.green())))?;
+                        } else {
+                            execute!(stdout, Print(c))?;
+                        }
+                    }
                     execute!(stdout, RestorePosition)?;
                     execute!(stdout, MoveRight(1))?;
                     execute!(stdout, Show)?;
