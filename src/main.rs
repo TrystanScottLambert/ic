@@ -91,6 +91,8 @@ fn main() -> io::Result<()> {
                         execute!(stdout, Clear(ClearType::All))?;
                         print_in_prompt(&mut stdout, counter)?;
                         buffer.clear();
+                    } else if buffer.trim() == "exit" {
+                        break;
                     } else {
                         print_out_prompt(&mut stdout, counter)?;
                         let session = Session::init();
