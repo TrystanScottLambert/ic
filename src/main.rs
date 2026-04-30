@@ -1,4 +1,4 @@
-use crossterm::cursor::{MoveLeft, MoveRight, RestorePosition, SavePosition, position};
+use crossterm::cursor::{Hide, MoveLeft, MoveRight, RestorePosition, SavePosition, Show, position};
 use crossterm::style::Stylize;
 use crossterm::terminal::{Clear, ClearType};
 use crossterm::{
@@ -52,19 +52,28 @@ fn main() -> io::Result<()> {
     execute!(stdout, Clear(ClearType::All))?;
     execute!(stdout, Print("\n\r"))?;
     print_in_prompt(&mut stdout, counter)?;
-    execute!(stdout, SavePosition)?;
     loop {
         let thing = event::read()?;
         match thing {
             Event::Key(key_event) => match key_event.code {
                 KeyCode::Esc => break,
                 KeyCode::Char(c) => {
+                    let (column, _) = position()?;
+                    let target_position = column - start_line_position;
+                    let (pre, post) = buffer.split_at(target_position as usize);
+                    execute!(stdout, SavePosition)?;
+                    execute!(stdout, Hide)?;
+                    execute!(stdout, Clear(ClearType::UntilNewLine))?;
                     if c.is_numeric() || c == '.' {
                         execute!(stdout, Print(format!("{}", c.green())))?;
                     } else {
                         execute!(stdout, Print(c))?;
                     }
-                    buffer.push(c);
+                    execute!(stdout, Print(post))?;
+                    execute!(stdout, RestorePosition)?;
+                    execute!(stdout, MoveRight(1))?;
+                    execute!(stdout, Show)?;
+                    buffer = format!("{}{}{}", pre, c, post);
                 }
                 KeyCode::Enter => {
                     execute!(stdout, Print("\r\n"))?;
@@ -124,20 +133,28 @@ fn main() -> io::Result<()> {
                     }
                 }
                 KeyCode::Backspace => {
-                    buffer.pop();
-                    reset_prompt(&mut stdout, counter)?;
-                    print_color_string(&mut stdout, buffer.clone())?;
+                    let (column, _) = position()?;
+                    if column > start_line_position {
+                        let target_position = column - start_line_position - 1;
+                        execute!(stdout, SavePosition)?;
+                        buffer.remove(target_position as usize);
+
+                        reset_prompt(&mut stdout, counter)?;
+                        print_color_string(&mut stdout, buffer.clone())?;
+                        execute!(stdout, RestorePosition)?;
+                        execute!(stdout, MoveLeft(1))?;
+                    }
                 }
                 KeyCode::Left => {
                     let (column, _) = position()?;
                     if column > start_line_position {
-                        execute!(stdout, MoveLeft(1), SavePosition)?;
+                        execute!(stdout, MoveLeft(1))?;
                     }
                 }
                 KeyCode::Right => {
                     let (column, _) = position()?;
                     if column < (buffer.len() as u16) + start_line_position {
-                        execute!(stdout, MoveRight(1), SavePosition)?;
+                        execute!(stdout, MoveRight(1))?;
                     }
                 }
                 _ => {}
